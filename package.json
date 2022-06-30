@@ -1,0 +1,23 @@
+{
+  "name": "stomplaygen",
+  "version": "1.0.0",
+  "description": "",
+  "main": "stomplaygen.js",
+  "directories": {
+    "example": "example"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ikonopistsev/stomplay.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ikonopistsev/stomplay/issues"
+  },
+  "homepage": "https://github.com/ikonopistsev/stomplay#readme"
+}
