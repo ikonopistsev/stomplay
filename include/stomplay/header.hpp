@@ -7,6 +7,8 @@
 namespace stomplay {
 namespace header {
 
+// TODO странный класс...
+// появился set(sv,sv) надобность сомнительна
 template<class K, class V>
 class base
 {
@@ -35,7 +37,7 @@ public:
 };
 
 template<class K, class V>
-constexpr static inline auto make(K key, V val) noexcept
+constexpr static auto make(K key, V val) noexcept
 {
     return base<K, V>(std::move(key), std::move(val));
 }
@@ -68,7 +70,7 @@ public:
 };
 
 template<class K, class V>
-constexpr static inline auto make_ref(K key, V val) noexcept
+constexpr static auto make_ref(K key, V val) noexcept
 {
     return base_ref<K, V>(std::move(key), std::move(val));
 }

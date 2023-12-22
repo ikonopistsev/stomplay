@@ -19,7 +19,7 @@ struct create_buffer {
 };
 
 // вставка в конец буфера
-template<class C1, class C2>
+template<class T, class V>
 struct move_back;
 
 template<class T, class V>

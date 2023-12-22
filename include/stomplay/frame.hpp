@@ -30,7 +30,7 @@ public:
     template<class V>
     constexpr frame(method::ref<V>)
     {
-        append_ref(V::text);
+        add_back_ref(V::text);
     }
 
     frame(frame&&) = default;
@@ -38,76 +38,102 @@ public:
 
     virtual ~frame() = default;
 
-private:
-    // all non ref
-    void push_header(std::string_view key, std::string_view value)
-    {
-        if (key.empty())
-            throw std::logic_error("header key empty");
-
-        if (value.empty())
-            throw std::logic_error("frame header value empty");
-
-        using namespace std::literals;
-        append_ref("\n"sv);
-        append(key);
-        append_ref(":"sv);
-        append(value);
-    }
-
-    // key ref, val non ref
-    void push_prepared_header(std::string_view prepared_key,
-        std::string_view value)
-    {
-        assert(!prepared_key.empty());
-        if (value.empty())
-            throw std::logic_error("frame header value empty");
-        append_ref(prepared_key);
-        append(value);
-    }
-
 protected:
+    void move_back(auto val)
+    {
+        ops::move_back<T, decltype(val)> f;
+        f(buffer_, std::move(val));
+    }
+
     template<class V>
-    void append(const V& val)
+    void add_back(const V& val)
     {
         ops::copy_back<T, V> f;
         f(buffer_, val);
     }
 
     template<class V>
-    void append_ref(V val)
+    void add_back_ref(const V& val)
     {
         ops::ref_back<T, V> f;
-        f(buffer_, std::move(val));
+        f(buffer_, val);
+    }
+
+    static void value_not_empty(const auto& value)
+    {
+        if (value.empty())
+            throw std::logic_error("header value empty");
+    }
+
+    static void header_not_empty(const auto& key, const auto& value)
+    {
+        if (key.empty())
+            throw std::logic_error("header key empty");
+
+        value_not_empty(value);
     }
 
 public:
+    buffer_type& content() noexcept
+    {
+        return buffer_;
+    }
+
+public:
+    void set(std::string_view key, std::string_view value)
+    {
+        header_not_empty(key, value);
+
+        using namespace std::literals;
+        add_back_ref("\n"sv);
+        add_back(key);
+        add_back_ref(":"sv);
+        add_back(value);
+    }
+
     // выставить хидер
     template<class K, class V>
-    void push(header::base<K, V> hdr)
+    void set(header::base<K, V> hdr)
     {
-        push_header(hdr.key(), hdr.value());
+        set(hdr.key(), hdr.value());
     }
+
+    // выставить хидер
+    template<class K, class V>
+    void set(header::base_ref<K, V> hdr)
+    {
+        auto& key = hdr.key();
+        auto& value = hdr.value();
+        header_not_empty(key, value);
+
+        using namespace std::literals;
+        add_back_ref("\n"sv);
+        add_back_ref(key);
+        add_back_ref(":"sv);
+        add_back_ref(value);
+    }    
 
     // выставить известный хидер
     // добавляем ключ как ссылку на строку
     template<class K, class V>
-    void push(header::known<K, V> hdr)
+    void set(header::known<K, V> hdr)
     {
-        push_prepared_header(hdr.key(), hdr.value());
+        auto& prepared_key = hdr.key();
+        auto& value = hdr.value();        
+        assert(!prepared_key.empty());
+
+        value_not_empty(value);
+
+        add_back_ref(prepared_key);
+        add_back(value);
     }
 
     // выставить известный хидер
     // добавляем ключ как ссылку на строку
     template<class K>
-    void push(header::known_ref<K> hdr)
+    void set(header::known_ref<K> hdr)
     {
-        append_ref(hdr.key_val());
-    }
-
-    buffer_type&& content()
-    {
-        return std::move(buffer_);
+        add_back_ref(hdr.key_val());
     }
 };
 
@@ -120,14 +146,13 @@ class body_frame
 protected:
     using buffer_type = T;
     buffer_type payload_{};
-    using base_type::append;
-    using base_type::append_ref;
+    using base_type::add_back_ref;
+    using base_type::move_back;
 
 public:
-    using base_type::push;
+    using base_type::set;
 
-    template<class V>
-    constexpr body_frame(V method)
+    constexpr body_frame(auto method)
         : base_type{method}
     {   }
 
@@ -136,37 +161,61 @@ public:
 
     virtual ~body_frame() override = default;
 
-    template<class V>
-    void push_payload(V val)
+    void push(auto val)
     {
-        ops::move_back<T, V> f;
+        ops::move_back<T, decltype(val)> f;
         f(payload_, std::move(val));
     }
 
-    void push_payload(const char *data, std::size_t size)
+    template<class V>
+    void push_ref(const V& val)
     {
-        push_payload(std::string_view{data, size});
+        ops::ref_back<T, V> f;
+        f(payload_, val);
     }
 
-    buffer_type&& content()
+    template<class V>   
+    void copy(const V& val)
+    {
+        ops::copy_back<T, V> f;
+        f(payload_, val);
+    }
+
+    void push_payload(auto val)
+    {
+        push(std::move(val));
+    }
+
+    void copy_payload(const auto& val)
+    {
+        copy(val);
+    }
+
+    void push_payload_ref(const auto& val)
+    {
+        push_ref(val);
+    }
+
+    buffer_type& content()
     {
         using namespace std::literals;
         auto size = payload_.size();
         if (size)
         {
             // дописываем размер
-            push(header::content_length(size));
+            set(header::content_length(size));
 
             // разделитель хидеров
-            append("\n\n"sv);
+            add_back_ref("\n\n"sv);
 
-            // дописываем протокольный ноль
-            push_payload("\0"sv);
+            // дописываем протокольный ноль в payload
+            push_ref("\0"sv);
 
-            append(std::move(payload_));
+            // объединяем хидеры и payload
+            move_back(std::move(payload_));
         }
         else
-            append("\n\n\0"sv);
+            add_back_ref("\n\n\0"sv);
 
         return base_type::content();
     }
@@ -177,26 +226,27 @@ class basic_logon final
     : frame<T>
 {
     using base_type = frame<T>;
-    using base_type::append;
+    using base_type::content;
+    using base_type::add_back_ref;
 public:
     using buffer_type = T;
-    using base_type::push;
+    using base_type::set;
 
     basic_logon(std::string_view host)
         : base_type{method::connect()}
     {   
         using namespace std::literals;
-        push(header::accept_version_v12());
+        set(header::accept_version_v12());
         if (host.empty())
             host = "/"sv;
-        push(header::host(host));
+        set(header::host(host));
     }
 
     basic_logon(std::string_view host, std::string_view login)
         : basic_logon(host)
     {
         if (!login.empty())
-            push(header::login(login));
+            set(header::login(login));
     }
 
     basic_logon(std::string_view host, std::string_view login,
@@ -204,13 +254,13 @@ public:
         : basic_logon(host, login)
     {
         if (!passcode.empty())
-            push(header::passcode(passcode));
+            set(header::passcode(passcode));
     }
 
-    buffer_type&& content()
+    buffer_type& content()
     {
        using namespace std::literals;
-       append("\n\n\0"sv);
+       add_back_ref("\n\n\0"sv);
        return base_type::content();
     }
 };
@@ -221,14 +271,14 @@ class basic_send final
 {
     using base_type = body_frame<T>;
 public:
+    using base_type::set;
     using base_type::push;
     using base_type::content;
-    using base_type::push_payload;
 
     basic_send(std::string_view dest)
         : base_type{method::send()}
     {
-        push(header::destination(dest));
+        set(header::destination(dest));
     }
 };
 
@@ -238,13 +288,13 @@ class basic_ack final
 {
     using base_type = frame<T>;
 public:
-    using base_type::push;
+    using base_type::set;
     using base_type::content;
 
     basic_ack(std::string_view ack_id)
         : base_type{method::ack()}
     {   
-        push(header::id(ack_id));
+        set(header::id(ack_id));
     }
 };
 

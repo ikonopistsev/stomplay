@@ -7,20 +7,6 @@
 namespace stomplay {
 namespace ops {
 
-// реализация подготовки буфера
-template<>
-struct create_buffer<std::vector<char>>
-{
-    using type = std::vector<char>;
-
-    type operator()(std::size_t reserve)
-    {
-        type buf;
-        buf.reserve(reserve);
-        return buf;
-    }
-};
-
 // вставка в конец строки
 // всегда будем копировать
 template<>
