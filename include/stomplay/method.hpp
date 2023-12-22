@@ -7,93 +7,82 @@ namespace stomplay {
 namespace method {
 
 template<class T>
-class known_ref
-{
-public:
-    using value_type = decltype (T::text);
-
-public:
-    constexpr known_ref() = default;
-
-    constexpr const value_type& value() const noexcept
-    {
-        return T::text;
-    }
-};
+struct ref
+{   };
 
 constexpr static auto ack() noexcept
 {
-    return known_ref<tag::ack>();
+    return ref<tag::ack>();
 }
 
 constexpr static auto nack() noexcept
 {
-    return known_ref<tag::nack>();
+    return ref<tag::nack>();
 }
 
 constexpr static auto send() noexcept
 {
-    return known_ref<tag::send>();
+    return ref<tag::send>();
 }
 
 constexpr static auto abort() noexcept
 {
-    return known_ref<tag::abort>();
+    return ref<tag::abort>();
 }
 
 constexpr static auto begin() noexcept
 {
-    return known_ref<tag::begin>();
+    return ref<tag::begin>();
 }
 
 constexpr static auto error() noexcept
 {
-    return known_ref<tag::error>();
+    return ref<tag::error>();
 }
 
 constexpr static auto stomp() noexcept
 {
-    return known_ref<tag::stomp>();
+    return ref<tag::stomp>();
 }
 
 constexpr static auto commit() noexcept
 {
-    return known_ref<tag::commit>();
+    return ref<tag::commit>();
 }
 
 constexpr static auto connect() noexcept
 {
-    return known_ref<tag::connect>();
+    return ref<tag::connect>{};
 }
 
 constexpr static auto message() noexcept
 {
-    return known_ref<tag::message>();
+    return ref<tag::message>();
 }
 
 constexpr static auto receipt() noexcept
 {
-    return known_ref<tag::receipt>();
+    return ref<tag::receipt>();
 }
 
 constexpr static auto subscribe() noexcept
 {
-    return known_ref<tag::subscribe>();
+    return ref<tag::subscribe>();
 }
 
 constexpr static auto connected() noexcept
 {
-    return known_ref<tag::connected>();
+    return ref<tag::connected>();
 }
 
 constexpr static auto disconnect() noexcept
 {
-    return known_ref<tag::disconnect>();
+    return ref<tag::disconnect>();
 }
 
 constexpr static auto unsubscribe() noexcept
 {
-    return known_ref<tag::unsubscribe>();
+    return ref<tag::unsubscribe>();
 }
 
 } // namespace method

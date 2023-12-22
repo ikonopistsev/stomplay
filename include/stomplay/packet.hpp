@@ -22,10 +22,10 @@ public:
 
     packet(const header_store& header, std::string_view session,
         stomptalk::method::generic method, buffer payload)
-        : header_(header)
-        , session_(session)
-        , method_(method)
-        , payload_(std::move(payload))
+        : header_{header}
+        , session_{session}
+        , method_{method}
+        , payload_{std::move(payload)}
     {   }
 
     void set_subscription_id(std::string_view subscription_id) noexcept

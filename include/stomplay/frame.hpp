@@ -2,32 +2,86 @@
 
 #include "stomplay/header.hpp"
 #include "stomplay/method.hpp"
+#include "stomplay/ops/fwd.hpp"
 #include <stdexcept>
 #include <cassert>
+
+#ifndef STOMPLAY_CREATE_BUFFER_RESERVE_SIZE
+#define STOMPLAY_CREATE_BUFFER_RESERVE_SIZE 320
+#endif
 
 namespace stomplay {
 
 template<class T>
+static inline T frame_buffer_create(
+    std::size_t reserve = STOMPLAY_CREATE_BUFFER_RESERVE_SIZE)
+{
+    ops::create_buffer<T> f;
+    return f(reserve);
+}
+
+template<class T>
 class frame
 {
-protected:
     using buffer_type = T;
-    buffer_type header_{};
+    buffer_type buffer_{frame_buffer_create<T>()};
 
-public:
-    frame() = default;
-    virtual ~frame() = default;
+public:    
+    template<class V>
+    constexpr frame(method::ref<V>)
+    {
+        append_ref(V::text);
+    }
 
     frame(frame&&) = default;
     frame& operator=(frame&&) = default;
 
-    // выставить method
-    template<class V>
-    void push(method::known_ref<V> method)
+    virtual ~frame() = default;
+
+private:
+    // all non ref
+    void push_header(std::string_view key, std::string_view value)
     {
-        push_method(method.value());
+        if (key.empty())
+            throw std::logic_error("header key empty");
+
+        if (value.empty())
+            throw std::logic_error("frame header value empty");
+
+        using namespace std::literals;
+        append_ref("\n"sv);
+        append(key);
+        append_ref(":"sv);
+        append(value);
     }
 
+    // key ref, val non ref
+    void push_prepared_header(std::string_view prepared_key,
+        std::string_view value)
+    {
+        assert(!prepared_key.empty());
+        if (value.empty())
+            throw std::logic_error("frame header value empty");
+        append_ref(prepared_key);
+        append(value);
+    }
+
+protected:
+    template<class V>
+    void append(const V& val)
+    {
+        ops::copy_back<T, V> f;
+        f(buffer_, val);
+    }
+
+    template<class V>
+    void append_ref(V val)
+    {
+        ops::ref_back<T, V> f;
+        f(buffer_, std::move(val));
+    }
+
+public:
     // выставить хидер
     template<class K, class V>
     void push(header::base<K, V> hdr)
@@ -40,7 +94,7 @@ public:
     template<class K, class V>
     void push(header::known<K, V> hdr)
     {
-        push_header_val(hdr.key(), hdr.value());
+        push_prepared_header(hdr.key(), hdr.value());
     }
 
     // выставить известный хидер
@@ -48,87 +102,149 @@ public:
     template<class K>
     void push(header::known_ref<K> hdr)
     {
-        push_header_ref(hdr.key_val());
+        append_ref(hdr.key_val());
     }
 
-protected:
-    // all non ref
-    virtual void push_header(std::string_view key, std::string_view value)
+    buffer_type&& content()
     {
-        if (key.empty())
-            throw std::logic_error("header key empty");
-
-        if (value.empty())
-            throw std::logic_error("frame header value empty");
-
-        using namespace std::literals;
-        header_ += "\n"sv;
-        header_ += key;
-        header_ += ":"sv;
-        header_ += value;
-    }
-    // all ref
-    virtual void push_header_ref(std::string_view prepared_key_value)
-    {
-        assert(!prepared_key_value.empty());
-        header_ += prepared_key_value;
-    }
-    // key ref, val non ref
-    virtual void push_header_val(std::string_view prepared_key,
-                         std::string_view value)
-    {
-        assert(!prepared_key.empty());
-        if (value.empty())
-            throw std::logic_error("frame header value empty");
-        header_ += prepared_key;
-        header_ += value;
-    }
-
-    virtual void push_method(std::string_view method)
-    {
-        if (method.empty())
-            throw std::logic_error("frame method empty");
-        header_ += method;
-    }
-
-    // complete frame before write
-    virtual void complete()
-    {
-        using namespace std::literals;
-        header_ += "\n\n\0"sv;
+        return std::move(buffer_);
     }
 };
 
 template<class T>
-class logon final
-    : public frame<T>
+class body_frame
+    : frame<T>
 {
-    using frame<T>::push;
-    
+    using base_type = frame<T>;
+
+protected:
+    using buffer_type = T;
+    buffer_type payload_{};
+    using base_type::append;
+    using base_type::append_ref;
+
 public:
-    logon(std::string_view host)
+    using base_type::push;
+
+    template<class V>
+    constexpr body_frame(V method)
+        : base_type{method}
+    {   }
+
+    body_frame(body_frame&&) = default;
+    body_frame& operator=(body_frame&&) = default;
+
+    virtual ~body_frame() override = default;
+
+    template<class V>
+    void push_payload(V val)
+    {
+        ops::move_back<T, V> f;
+        f(payload_, std::move(val));
+    }
+
+    void push_payload(const char *data, std::size_t size)
+    {
+        push_payload(std::string_view{data, size});
+    }
+
+    buffer_type&& content()
+    {
+        using namespace std::literals;
+        auto size = payload_.size();
+        if (size)
+        {
+            // дописываем размер
+            push(header::content_length(size));
+
+            // разделитель хидеров
+            append("\n\n"sv);
+
+            // дописываем протокольный ноль
+            push_payload("\0"sv);
+
+            append(std::move(payload_));
+        }
+        else
+            append("\n\n\0"sv);
+
+        return base_type::content();
+    }
+};
+
+template<class T>
+class basic_logon final
+    : frame<T>
+{
+    using base_type = frame<T>;
+    using base_type::append;
+public:
+    using buffer_type = T;
+    using base_type::push;
+
+    basic_logon(std::string_view host)
+        : base_type{method::connect()}
     {   
         using namespace std::literals;
-        push(method::connect());
         push(header::accept_version_v12());
         if (host.empty())
             host = "/"sv;
         push(header::host(host));
     }
 
-    logon(std::string_view host, std::string_view login)
-        : logon(host)
+    basic_logon(std::string_view host, std::string_view login)
+        : basic_logon(host)
     {
         if (!login.empty())
             push(header::login(login));
     }
 
-    logon(std::string_view host, std::string_view login,
+    basic_logon(std::string_view host, std::string_view login,
         std::string_view passcode)
-        : logon(host, login)
+        : basic_logon(host, login)
     {
         if (!passcode.empty())
-            push(header::passcode(passcode));        
+            push(header::passcode(passcode));
+    }
+
+    buffer_type&& content()
+    {
+       using namespace std::literals;
+       append("\n\n\0"sv);
+       return base_type::content();
+    }
+};
+
+template<class T>
+class basic_send final
+    : body_frame<T>
+{
+    using base_type = body_frame<T>;
+public:
+    using base_type::push;
+    using base_type::content;
+    using base_type::push_payload;
+
+    basic_send(std::string_view dest)
+        : base_type{method::send()}
+    {
+        push(header::destination(dest));
+    }
+};
+
+template<class T>
+class basic_ack final
+    : frame<T>
+{
+    using base_type = frame<T>;
+public:
+    using base_type::push;
+    using base_type::content;
+
+    basic_ack(std::string_view ack_id)
+        : base_type{method::ack()}
+    {   
+        push(header::id(ack_id));
     }
 };
 

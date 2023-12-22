@@ -119,6 +119,10 @@ constexpr static auto content_type(std::string_view val) noexcept
     return known<tag::content_type, std::string_view>(val);
 }
 
+constexpr static auto content_type_json() noexcept {
+    return known_ref<tag::content_type>(tag::content_type::header_application_json());
+}
+
 constexpr static auto accept_version(std::string_view val) noexcept
 {
     return known<tag::accept_version, std::string_view>(val);
@@ -449,71 +453,9 @@ constexpr static auto version_v12() noexcept {
     return known_ref<tag::version>(tag::version::header_v12());
 }
 
-//template<class T>
-//using kr = known_ref<T, std::string_view>;
-
-//constexpr static auto durable_on() noexcept {
-//    return known_ref<tag::durable>(tag::enable());
-//}
-
-//constexpr static auto durable_off() noexcept {
-//    return kr<tag::durable>(tag::disable());
-//}
-
-//constexpr static auto auto_delete_on() noexcept {
-//    return kr<tag::auto_delete>(tag::enable());
-//}
-
-//constexpr static auto auto_delete_off() noexcept {
-//    return kr<tag::auto_delete>(tag::disable());
-//}
-
-//constexpr static auto persistent_on() noexcept {
-//    return persistent(tag::enable());
-//}
-
-//constexpr static auto ver12() noexcept {
-//    return kr<tag::accept_version>(tag::accept_version::v12());
-//}
-
-//constexpr static auto ack_client_individual() noexcept {
-//    return kr<tag::ack>(tag::ack::client_individual());
-//}
-
-//constexpr static auto ack_client() noexcept {
-//    return kr<tag::ack>(tag::ack::client());
-//}
-
-//constexpr static auto content_type_text_xml() noexcept {
-//    return kr<tag::content_type>(tag::content_type::text_xml());
-//}
-//constexpr static auto content_type_text_html() noexcept {
-//    return kr<tag::content_type>(tag::content_type::text_html());
-//}
-//constexpr static auto content_type_text_plain() noexcept {
-//    return kr<tag::content_type>(tag::content_type::text_plain());
-//}
-//constexpr static auto content_type_xml() noexcept {
-//    return kr<tag::content_type>(tag::content_type::xml());
-//}
-//constexpr static auto content_type_json() noexcept {
-//    return kr<tag::content_type>(tag::content_type::json());
-//}
-//constexpr static auto content_type_octet() noexcept {
-//    return kr<tag::content_type>(tag::content_type::octet());
-//}
-
-////typedef basic<tag::timestamp> timestamp;
-//constexpr static auto delivery_mode(std::string_view val) noexcept
-//{
-//    return known<tag::delivery_mode, std::string_view>(val);
-//}
-
-////typedef basic<tag::timestamp> timestamp;
-//static inline auto delivery_mode(std::size_t val) noexcept
-//{
-//    return known<tag::delivery_mode, std::string>(std::to_string(val));
-//}
+constexpr static auto persistent_on() noexcept {
+    return known_ref<tag::persistent>(tag::persistent::header_enable());
+}
 
 } // namespace header
 } // namespace stomptalk
